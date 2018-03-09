@@ -21,6 +21,10 @@ cleanCalData <- function(df){
     df$o2Stan <- 100
     df$co2Stan <- 0
     df$n2Stan <- 0
+  }else if (stage == "CO2pure"){
+    df$o2Stan <- NA
+    df$co2Stan <- 100
+    df$n2Stan <- NA
   }
   df
 }

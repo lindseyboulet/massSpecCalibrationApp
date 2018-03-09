@@ -65,7 +65,8 @@ ui <- fluidPage(
                                           "Cal Gas" = "calGas",
                                           "9% CO2, Bal N2" = "CO2",
                                           "Mixed Venous" = "test",
-                                          "100% O2" = "O2"))
+                                          "100% O2" = "O2",
+                                          "100% CO2" = "CO2pure"))
         )
       )
     ),

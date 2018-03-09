@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# Ignore csv output file directory
+data/calOutput/
