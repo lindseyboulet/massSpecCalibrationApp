@@ -1,0 +1,37 @@
+---
+title: "MIMS Calibration Report"
+author: "Boulet LM"
+date: "`r format(Sys.time(), c('%d %B, %Y','%H:%M'))`"
+output: html_document
+params: 
+  o2Curve: NA
+  o2CurveTable: NA
+  co2Curve: NA
+  co2CurveTable: NA
+  n2Curve: NA
+  n2CurveTable: NA
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## MIMS Calibration
+### O2 Curve
+<br>
+```{r o2, echo=FALSE}
+params$o2Curve
+params$o2CurveTable
+```
+### CO2 Curve
+<br>
+```{r co2, echo=FALSE}
+params$co2Curve
+params$co2CurveTable
+```
+### N2 Curve
+<br>
+```{r n2, echo=FALSE}
+params$n2Curve
+params$n2CurveTable
+```
