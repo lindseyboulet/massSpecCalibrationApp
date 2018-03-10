@@ -1,6 +1,6 @@
 cleanCalData <- function(df){
   stage <- df$stage[1]
-  df <- summarise_all(df, mean)
+  df <- summarise_all(df, mean, na.rm = TRUE)
   if(stage == "N2"){
     df$o2Stan <- 0
     df$co2Stan <- 0
