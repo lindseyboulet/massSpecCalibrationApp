@@ -21,17 +21,17 @@ knitr::opts_chunk$set(echo = TRUE)
 <br>
 ```{r o2, echo=FALSE}
 params$o2Curve
-params$o2CurveTable
+kable(params$o2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
 ```
 ### CO2 Curve
 <br>
 ```{r co2, echo=FALSE}
 params$co2Curve
-params$co2CurveTable
+kable(params$co2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
 ```
 ### N2 Curve
 <br>
 ```{r n2, echo=FALSE}
 params$n2Curve
-params$n2CurveTable
+kable(params$n2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
 ```

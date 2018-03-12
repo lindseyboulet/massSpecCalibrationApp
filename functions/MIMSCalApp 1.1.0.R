@@ -1,6 +1,6 @@
 y <- c("shiny", "plyr", "dplyr", "reshape", "shinythemes", "ggplot2", "readr", "shinyFiles",
        "shinyjs", "taRifx", "shinydashboard", "here", "plotrix", "data.table", "gridExtra",
-       "rmarkdown", "lubridate", "chron", "ggthemes", "knitr")
+       "rmarkdown", "lubridate", "chron", "ggthemes", "knitr", "pander")
 for(i in 1:length(y)){is_installed <- function(mypkg){is.element(mypkg, installed.packages()[,1])}
 if(!is_installed(y[i])){install.packages(y[i], repos="http://lib.stat.cmu.edu/R/CRAN")
 }
