@@ -1,25 +1,31 @@
 y <- c("shiny", "plyr", "dplyr", "reshape", "shinythemes", "ggplot2", "readr", "shinyFiles",
        "shinyjs", "taRifx", "shinydashboard", "here", "plotrix", "data.table", "gridExtra",
-       "rmarkdown", "lubridate", "chron", "ggthemes", "knitr", "pander")
+       "rmarkdown", "lubridate", "chron", "ggthemes", "knitr")
 for(i in 1:length(y)){is_installed <- function(mypkg){is.element(mypkg, installed.packages()[,1])}
 if(!is_installed(y[i])){install.packages(y[i], repos="http://lib.stat.cmu.edu/R/CRAN")
 }
 library(y[i], character.only=TRUE, quietly=TRUE,verbose=FALSE)
 }
 
-fileNames <- list.files(here::here("data", "jarData"))
+fileNames <- list.files(here::here("data"))
 source(here::here("functions", "cleanSpecDataFunc.R"))
 source(here::here("functions", "cleanCalData.R"))
 
 
 ui <- fluidPage(
-  h2(strong("MIMS Calibration")),
+  tags$style(HTML("
+        .tabs-above > .nav > li[class=active] > a {
+           background-color: #3e3e40;
+           color: #3e3e40;
+        }")),
+  h2(strong("MIMS Analysis")),
   tabsetPanel(
     tabPanel("Raw Data",
+       br(),
       fluidRow(
         column(4,
           selectInput(inputId = "calFile", 
-                      label = strong("Raw Cal File"),choices = fileNames)
+                      label = strong("Raw File"),choices = fileNames)
         ),
         column(2,
                textInput(inputId = "xmin", label = strong("X-min"),
@@ -72,34 +78,53 @@ ui <- fluidPage(
       ),
       br(),
       fluidRow(
-        column(2, actionButton("exclude_toggle",
+        column(1, actionButton("exclude_toggle",
                                       "Select Points")
         ),
-        column(2,
+        column(1,
                actionButton("exclude_reset", "Reset")
         )
         ,
-        column(2,
-                 actionButton("saveData", "Save Cal Data")
+        column(1,
+               actionButton("refreshData", "Refresh Data")
         ),
         column(2,
-               actionButton("refreshData", "Refresh Data")
-        )
-      ),
-      fluidRow(
-        column(2,
                selectInput(inputId = "gasStage", 
-                           label = strong("Cal Stage"),
+                           label = strong("Gas Stage"),
                            choices = list("100% N2" = "N2",
                                           "Cal Gas" = "calGas",
                                           "9% CO2, Bal N2" = "CO2",
-                                          "Mixed Venous" = "test",
+                                          "Mixed Venous" = "mixed",
                                           "100% O2" = "O2",
-                                          "100% CO2" = "CO2pure"))
+                                          "100% CO2" = "CO2pure",
+                                          "Stand By" = "standby",
+                                          "Room Air" = "roomAir",
+                                          "Compressed" = "compressed"))
+        ),
+        column(1,
+               numericInput(inputId = "baro", label = strong("ATM Pressure"),
+                         value = NULL)),
+        column(1,
+               radioButtons("atmUnits", "ATM Units", c("in Hg" = "in",
+                                                       "mmHg" = "mm"))),
+        column(1, 
+               radioButtons("dataType", "Data Type", choices = c("Calibration" = "cal",
+                                                                 "Experimental" = "exp"))
+        ),
+       
+        conditionalPanel(condition = "input.dataType == 'exp'",
+                column(1,
+                    textInput("expTag", label = "Data Tag", value = NULL)
+               )),
+        column(1,
+               actionButton("saveData", strong("Save Data"))
         )
+        
+        
+        
       )
     ),
-    tabPanel("Calibration Curves",
+    tabPanel("Data Output",
       fluidRow(
        column(6,
               h3(strong("O2 Curve"))
@@ -141,8 +166,24 @@ ui <- fluidPage(
       ),
       br(),
       fluidRow(
+        column(6,
+               h3(strong("Experimental Data"))
+        )
+      ),
+      fluidRow(
+        column(6,
+               p("(predicted values in mmHg)")
+        )
+      ),
+      fluidRow(
+        column(12,
+               tableOutput(outputId = "resultsTable")
+               )
+      ),
+      br(),
+      fluidRow(
         column(3, downloadButton("renderMarkdown",
-                               "Save Cal Report")
+                               "Save Report")
         ),
         column(3, actionButton("refreshCurves",
                                  "Refresh")
@@ -152,7 +193,7 @@ ui <- fluidPage(
     )
   )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   output$text1 <- renderText({ "Red: O2" })
   output$text2 <- renderText({ "Blue: CO2" })
@@ -161,13 +202,13 @@ server <- function(input, output) {
   
   cleanedSpecData <- reactive({
     input$refreshData
-    fileName <- paste(here::here("data", "jarData", input$calFile))
+    fileName <- paste(here::here("data", input$calFile))
     calData <-  read.table(fileName, fill = TRUE, skip = 21)
     rawDataList <- cleanSpecData(calData)
     rawDataList
   })
-  
-  specVals <- reactiveValues(
+
+  specVals <- reactiveValues( 
     keepRows = rep(TRUE, isolate(nrow(cleanedSpecData()))))
   
   output$distPlot <- renderPlot({
@@ -210,10 +251,12 @@ server <- function(input, output) {
   
 # save selected data
   observeEvent(input$saveData, {
-    if(!dir.exists(here::here("data", "calOutput"))){
-      dir.create(here::here("data", "calOutput"))
+    if(input$dataType == "cal"){dirName <- "calOutput"}else{dirName <- "expOutput"}
+
+    if(!dir.exists(here::here("output", dirName))){
+      dir.create(here::here("output", dirName))
     }
-    saveName <- here::here("data", "calOutput", 
+    saveName <- here::here("output", dirName, 
                            paste(substr(input$calFile, 1, nchar(input$calFile)-4), "_", input$gasStage, ".csv",
                            sep = ""))
     i = 1
@@ -226,121 +269,138 @@ server <- function(input, output) {
       }
    
     }
-    write.csv(selectData(), saveName, row.names = FALSE)
+    df <- selectData()
+    if(input$dataType == "exp" & !is.null(input$expTag)){df$dataID <- input$expTag}
+    write.csv(df, saveName, row.names = FALSE)
   })
+  
   # Load Cal Curve Data
   calCurveData <- reactive({
     input$saveData
     input$refreshCurves
-    calFileName <- list.files(paste(here::here("data", "calOutput")), full.names = TRUE)
+    calFileName <- list.files(paste(here::here("output", "calOutput")), full.names = TRUE)
     calFiles <- lapply(calFileName, read.csv)
     calData <- ldply(calFiles, cleanCalData)
+    # if(input$atmUnits == "in"){baro <- input$baro * #conversion factor
+    # } else{
+        baro <- input$baro
+      # }
+    calData$atm <- baro
     calData
   })
   
+  # Load Exp Curve Data
+  expCurveData <- reactive({
+    input$saveData
+    input$refreshCurves
+    calFileName <- list.files(paste(here::here("output", "expOutput")), full.names = TRUE)
+    if(length(calFileName)>0){
+      calFiles <- lapply(calFileName, read.csv)
+      expData <- ldply(calFiles, cleanCalData)
+      # if(input$atmUnits == "in"){baro <- input$baro * #conversion factor
+      # } else{
+      baro <- input$baro
+      # }
+      expData$atm <- baro
+    }else(expData <- data.frame())
+      expData
+  })
+  
+coefExt <- function(model){
+  modelSum <- summary(model)
+  coef <- data.frame(modelSum$coefficients)
+  coef <- coef[,c(1,4)]
+  inter <- 
+    tab <- data.frame(matrix(nrow = 3, ncol = 2))
+  tab[1:3, 1] <- c("Slope:", "p-Value:", "Intercept:")
+  tab[1, 2] <- formatC(t(coef[2,1]), format = "e", digits = 2)
+  tab[2, 2] <- round(t(coef[2,2]),2)
+  tab[3, 2] <- round(t(coef[1,1]),1)
+  colnames(tab) <- ""
+  tab
+}  
+  
 o2Curve <- reactive({
     df <- calCurveData()
-    ggplot(df[df$o2Stan != 5,], aes(x = o2Stan, y = o2)) +
+    df2 <- expCurveData()
+   p1 <-  ggplot(df, aes(x = o2Stan, y = o2)) +
       geom_point(color = "#e41a1c", size = 4) +
       geom_smooth(method = "lm", se = FALSE, color = "#984ea3") +
-      geom_point(data = df[df$o2Stan == 5,], color = "#ff7f00", size = 4, shape = 17) +
       geom_smooth(method = "lm", se = FALSE, color = "#984ea3") +
       labs(x = "Standard (%)", y = "Measured (%)")+
       theme_solarized(base_size = 16) 
+   if(nrow(df2)>0){p1 <- p1 + geom_point(data = df2, color = "#ff7f00", size = 4, shape = 17)+
+     geom_text(data = df2, aes(label=rownames(df2)),hjust=-0.5, vjust=-0.5)}
+   p1
   })
 output$O2Cal <- renderPlot({o2Curve()})
 
 o2CurveTable <- reactive({
     df <- calCurveData()
-    model <- lm(o2Stan ~ o2, data = df[df$o2Stan != 5,])
-    modelSum <- summary(model)
-    coef <- data.frame(modelSum$coefficients)
-    coef <- coef[2,c(1,4)]
-    pred <- predict(model, df[df$o2Stan == 5, ])*6.77
-    lenP <- length(pred)
-    tab <- data.frame(matrix(nrow = lenP+2, ncol = 3))
-    tab[1:2, 1] <- c("Slope:", "p-Value")
-    tab[1:2, 3] <- ''
-    tab[1, 2] <- formatC(t(coef[1,1]), format = "e", digits = 2)
-    tab[2, 2] <- round(t(coef[1,2]),2)
-    for(i in 1:lenP){
-      tab[i+2,1] <- paste("test", i)  
-    }
-    tab[3:(lenP+2), 2] <- round(pred, 2)
-    tab[3:(lenP+2), 3] <- round(pred - (6.77*5))
-    colnames(tab) <- ""
-    tab
+    model <- lm(o2Stan ~ o2, data = df)
+    coefExt(model)
   })
 output$O2table <- renderTable({o2CurveTable()}, colnames = FALSE)
   
   co2Curve <- reactive({
     df <- calCurveData()
-    ggplot(df[df$o2Stan != 5,], aes(x = co2Stan, y = co2)) +
+    df2 <- expCurveData()
+    p1 <- ggplot(df, aes(x = co2Stan, y = co2)) +
       geom_point(color = "#377eb8", size = 4) +
       geom_smooth(method = "lm", se = FALSE, color = "#984ea3") +
-      geom_point(data = df[df$o2Stan == 5,], color = "#ff7f00", size = 4, shape = 17) +
       labs(x = "Standard (%)", y = "Measured (%)")+
       theme_solarized(base_size = 16) 
+    if(nrow(df2)>0){p1 <- p1 + geom_point(data = df2, color = "#ff7f00", size = 4, shape = 17)+
+      geom_text(data = df2, aes(label=rownames(df2)),hjust=-0.5, vjust=-0.5)}
+    p1
   })
   output$CO2Cal <- renderPlot({co2Curve()})
   
   co2CurveTable <- reactive({
     df <- calCurveData()
-    model <- lm(co2Stan ~ co2, data = df[df$o2Stan != 5,])
-    modelSum <- summary(model)
-    coef <- data.frame(modelSum$coefficients)
-    coef <- coef[2,c(1,4)]
-    pred <- predict(model, df[df$o2Stan == 5, ])*6.77
-    lenP <- length(pred)
-    tab <- data.frame(matrix(nrow = lenP+2, ncol = 3))
-    tab[1:2, 1] <- c("Slope:", "p-Value")
-    tab[1:2, 3] <- ''
-    tab[1, 2] <- formatC(t(coef[1,1]), format = "e", digits = 2)
-    tab[2, 2] <- round(t(coef[1,2]),2)
-    for(i in 1:lenP){
-      tab[i+2,1] <- paste("test", i)  
-    }
-    tab[3:(lenP+2), 2] <- round(pred, 2)
-    tab[3:(lenP+2), 3] <- round(pred - (6.77*6),1)
-    colnames(tab) <- ""
-    tab
+    model <- lm(co2Stan ~ co2, data = df)
+    coefExt(model)
   })
   output$CO2table <- renderTable({co2CurveTable()}, colnames = FALSE)
   
-
     n2Curve <- reactive({
     df <- calCurveData()
-    ggplot(df[df$o2Stan != 5,], aes(x = n2Stan, y = n2)) +
+    df2 <- expCurveData()
+    p1 <- ggplot(df, aes(x = n2Stan, y = n2)) +
       geom_point(color = "#4daf4a", size = 4) +
       geom_smooth(method = "lm", se = FALSE, color = "#984ea3") +
-      geom_point(data = df[df$o2Stan == 5,], color = "#ff7f00", size = 4, shape = 17) +
       labs(x = "Standard (%)", y = "Measured (%)")+
-      theme_solarized(base_size = 16) 
+      theme_solarized(base_size = 16)
+    if(nrow(df2)>0){p1 <- p1 + geom_point(data = df2, color = "#ff7f00", size = 4, shape = 17)+
+      geom_text(data = df2, aes(label=rownames(df2)),hjust=-0.5, vjust=-0.5)}
+    p1
   })
     output$N2Cal <- renderPlot({n2Curve()})
     
   n2CurveTable <- reactive({
     df <- calCurveData()
-    model <- lm(n2Stan ~ n2, data = df[df$o2Stan != 5,])
-    modelSum <- summary(model)
-    coef <- data.frame(modelSum$coefficients)
-    coef <- coef[2,c(1,4)]
-    pred <- predict(model, df[df$o2Stan == 5, ])*6.77
-    lenP <- length(pred)
-    tab <- data.frame(matrix(nrow = lenP+2, ncol = 3))
-    tab[1:2, 1] <- c("Slope:", "p-Value")
-    tab[1:2, 3] <- ''
-    tab[1, 2] <- formatC(t(coef[1,1]), format = "e", digits = 2)
-    tab[2, 2] <- round(t(coef[1,2]),2)
-    for(i in 1:lenP){
-      tab[i+2,1] <- paste("test", i)  
-    }
-    tab[3:(lenP+2), 2] <- round(pred, 2)
-    tab[3:(lenP+2), 3] <- round(pred - (6.77*89))
-    colnames(tab) <- ""
-    tab
+    model <- lm(n2Stan ~ n2, data = df)
+    coefExt(model)
   })
   output$N2table <- renderTable({n2CurveTable()}, colnames = FALSE)
+  
+  expDataTable <- reactive({
+    o2CurveTable <- o2CurveTable()
+    co2CurveTable <- co2CurveTable()
+    n2CurveTable <- n2CurveTable()
+    expData <- expCurveData()
+    baro <- expData$atm[1]
+    expData <- expData[, c(11, 13, 14, 2:4, 15:17)]
+    expData$predO2 <- (expData$o2 * as.numeric(o2CurveTable[1,2]) + as.numeric(o2CurveTable[3,2]))/100*(baro-49) 
+    expData$predCO2 <- (expData$co2 * as.numeric(co2CurveTable[1,2]) + as.numeric(co2CurveTable[3,2]))/100*(baro-49) 
+    expData$predN2 <- (expData$n2 * as.numeric(n2CurveTable[1,2]) + as.numeric(n2CurveTable[3,2]) )/100*(baro-49)
+    expData$o2Stan <- expData$o2Stan/100*(baro-49)
+    expData$co2Stan <- expData$co2Stan/100*(baro-49)
+    expData$n2Stan <- expData$n2Stan/100*(baro-49) 
+    expData[,-(4:6)]
+  })
+  output$resultsTable <- renderTable({expDataTable()}, rownames = TRUE)
+  
   
   output$renderMarkdown <- downloadHandler(
     # For PDF output, change this to "report.pdf"
@@ -358,7 +418,8 @@ output$O2table <- renderTable({o2CurveTable()}, colnames = FALSE)
                      co2Curve = co2Curve(),
                      co2CurveTable = co2CurveTable(),
                      n2Curve = n2Curve(),
-                     n2CurveTable = n2CurveTable())
+                     n2CurveTable = n2CurveTable(),
+                     resultsTable = expDataTable())
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
@@ -366,9 +427,16 @@ output$O2table <- renderTable({o2CurveTable()}, colnames = FALSE)
       rmarkdown::render(tempReport, output_file = file,
                         params = params,
                         envir = new.env(parent = globalenv())
+                        
       )
     }
   )
+  
+  
+
 }
+
+# create calibrated figures -----------------------------------------------
+
 
 shinyApp(ui = ui, server = server)

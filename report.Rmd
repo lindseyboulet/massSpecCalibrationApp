@@ -10,6 +10,7 @@ params:
   co2CurveTable: NA
   n2Curve: NA
   n2CurveTable: NA
+  resultsTable: NA
 ---
 
 ```{r setup, include=FALSE}
@@ -19,19 +20,27 @@ knitr::opts_chunk$set(echo = TRUE)
 ## MIMS Calibration
 ### O2 Curve
 <br>
-```{r o2, echo=FALSE}
-params$o2Curve
-kable(params$o2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
+```{r o2, echo=FALSE, message=FALSE, warning=FALSE}
+suppressWarnings(params$o2Curve)
+kable(params$o2CurveTable, format = "markdown", col.names = c("",""))
 ```
 ### CO2 Curve
 <br>
-```{r co2, echo=FALSE}
+```{r co2, echo=FALSE, message=FALSE, warning=FALSE}
 params$co2Curve
-kable(params$co2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
+kable(params$co2CurveTable, format = "markdown", col.names = c("",""))
 ```
 ### N2 Curve
 <br>
-```{r n2, echo=FALSE}
+```{r n2, echo=FALSE, message=FALSE, warning=FALSE}
 params$n2Curve
-kable(params$n2CurveTable, format = "markdown", col.names = c("","", "test error (mmHg)"))
+kable(params$n2CurveTable, format = "markdown", col.names = c("",""))
+```
+### Experimental Results
+<br>
+```{r results, echo=FALSE}
+kable(params$resultsTable, format = "markdown", col.names = c("Sec",	"Stage",	"ID",	
+                                                              "Expected O2",	"Expected CO2",	"Expected N2",	
+                                                              "Predicted O2",	"Predicted CO2",	"Predicted N2"),
+      row.names = TRUE)
 ```
